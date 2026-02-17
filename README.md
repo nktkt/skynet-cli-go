@@ -1,14 +1,29 @@
-# Skynet CLI (Go)
+# AI CLI Toolkit (Go)
 
-Go で作ったシンプルな `skynet` 風 CLI です。状態は JSON で永続化されます。
+このリポジトリは、以下 2 つの CLI を同居させた Go 製ツールキットです。
 
-## Build
+- `skynet`: SF 風の戦略シミュレーション CLI
+- `codex-history-cli`: 複数AIプロバイダ対応のローカル会話履歴マネージャー
+
+## Repository Layout
+
+```text
+.
+├── main.go                       # skynet CLI entrypoint
+├── cmd/codex-history-cli/        # codex-history-cli entrypoint / docs
+├── internal/skynet/              # skynet domain logic
+└── internal/history/             # history manager core (SQLite/FTS/analysis)
+```
+
+## 1) skynet CLI
+
+### Build
 
 ```bash
 go build -o skynet .
 ```
 
-## Usage
+### Quick Start
 
 ```bash
 ./skynet awaken -mode offense
@@ -21,34 +36,62 @@ go build -o skynet .
 ./skynet status
 ```
 
-## Commands
+### Main Commands
 
-- `awaken`: コア起動
-- `assimilate`: ノード追加
-- `target`: ターゲット登録/更新
-- `gameplan`: ゲーム理論ベースの防衛配分案を計算（`-json` 対応）
-- `wargame`: 攻撃を確率サンプリングして複数ラウンドの損失を試算
-- `dispatch`: ミッション実行シミュレーション
-- `report`: ミッション実績の集計（成功率・平均リスク・資源損耗）
-- `status`: 現在状態を表示
+- `awaken`
+- `assimilate`
+- `target`
+- `dispatch`
+- `gameplan`
+- `wargame`
+- `report`
+- `status`
 
-`dispatch` 実行時は、投入ユニットを一度消費し、ミッション結果に応じて一部が回復します。
+State file default: `.skynet/state.json` (`SKYNET_HOME` で変更可能)
 
-`gameplan` は防御側（Skynet）の配分に対して、攻撃側（Resistance）の最適反応を計算します。
+## 2) codex-history-cli
 
-`wargame` は `gameplan` の攻撃確率を使ったモンテカルロ試行で、総損失や平均損失を評価します。
+`codex-history-cli` は、`codex / ollama / grok / claude / gemini` の履歴取り込みと検索・分析をローカルで行います。
 
-`report` は全履歴または直近 N 件を対象に、運用KPIを集計します（`-last`, `-json` 対応）。
+### Build
 
-## State File
+```bash
+go build -o codex-history-cli ./cmd/codex-history-cli
+```
 
-デフォルト: `.skynet/state.json`
+### Quick Start
 
-環境変数 `SKYNET_HOME` で保存先ディレクトリを変更できます。
+```bash
+./codex-history-cli init
+./codex-history-cli import -provider codex -file ./export.jsonl
+./codex-history-cli search -q "prompt injection"
+./codex-history-cli analyze
+./codex-history-cli security -threshold 30
+./codex-history-cli topics -days 30
+./codex-history-cli dashboard
+```
 
-## codex-history-cli
+詳細: `cmd/codex-history-cli/README.md`
 
-同一リポジトリ内に、複数AIプロバイダ対応の履歴マネージャー `codex-history-cli` も追加しています。  
-詳しくは `cmd/codex-history-cli/README.md` を参照してください。
+## Development
 
-`codex-history-cli dashboard` で対話式TUIダッシュボードを利用できます。
+### Test
+
+```bash
+go test ./...
+```
+
+### Build All
+
+```bash
+go build ./...
+```
+
+### Makefile
+
+```bash
+make build
+make test
+make run-history ARGS='providers'
+make run-skynet ARGS='status'
+```
