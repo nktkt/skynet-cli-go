@@ -45,3 +45,10 @@ go build -o skynet .
 デフォルト: `.skynet/state.json`
 
 環境変数 `SKYNET_HOME` で保存先ディレクトリを変更できます。
+
+## codex-history-cli
+
+同一リポジトリ内に、複数AIプロバイダ対応の履歴マネージャー `codex-history-cli` も追加しています。  
+詳しくは `cmd/codex-history-cli/README.md` を参照してください。
+
+`codex-history-cli dashboard` で対話式TUIダッシュボードを利用できます。
