@@ -1,21 +1,13 @@
-.PHONY: build build-skynet build-history test run-skynet run-history fmt
+.PHONY: build test fmt run
 
-build: build-skynet build-history
-
-build-skynet:
+build:
 	go build -o skynet .
-
-build-history:
-	go build -o codex-history-cli ./cmd/codex-history-cli
 
 test:
 	go test ./...
 
 fmt:
-	gofmt -w main.go cmd/codex-history-cli/*.go internal/skynet/*.go internal/history/*.go
+	gofmt -w main.go internal/skynet/*.go
 
-run-skynet:
+run:
 	go run . $(ARGS)
-
-run-history:
-	go run ./cmd/codex-history-cli $(ARGS)
