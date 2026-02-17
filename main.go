@@ -48,6 +48,8 @@ func main() {
 		runGameplan(args, st)
 	case "wargame":
 		runWargame(args, st)
+	case "report":
+		runReport(args, st)
 	case "status":
 		runStatus(st, path)
 	case "help", "-h", "--help":
@@ -155,6 +157,31 @@ func runWargame(args []string, st skynet.State) {
 	}
 }
 
+func runReport(args []string, st skynet.State) {
+	fs := flag.NewFlagSet("report", flag.ExitOnError)
+	last := fs.Int("last", 0, "analyze only last N missions (0 means all)")
+	jsonOutput := fs.Bool("json", false, "print JSON output")
+	mustParse(fs, args)
+
+	report, err := skynet.BuildMissionReport(st, *last)
+	if err != nil {
+		fatalf("report failed: %v", err)
+	}
+	if *jsonOutput {
+		writeJSON(report)
+		return
+	}
+
+	fmt.Printf("REPORT: analyzed=%d/%d success=%d failed=%d success_rate=%.2f avg_risk=%.2f avg_net_loss=%.2f\n", report.AnalyzedMissions, report.TotalMissions, report.SuccessfulMissions, report.FailedMissions, report.SuccessRate, report.AverageRisk, report.AverageNetLoss)
+	fmt.Printf("RESOURCES: consumed=%d recovered=%d net_loss=%d\n", report.TotalConsumed, report.TotalRecovered, report.TotalNetLoss)
+	if report.MostTargeted != "" {
+		fmt.Printf("MOST TARGETED: %s (%d)\n", report.MostTargeted, report.MostTargetedCount)
+	}
+	if report.LastMissionAt != "" {
+		fmt.Printf("LAST MISSION AT: %s\n", report.LastMissionAt)
+	}
+}
+
 func runStatus(st skynet.State, path string) {
 	state := "OFFLINE"
 	if st.Core.Online {
@@ -218,6 +245,7 @@ Usage:
   skynet dispatch -target TARGET [-units 1]
   skynet gameplan [-budget N] [-beta 1.2] [-json]
   skynet wargame [-rounds 200] [-budget N] [-beta 1.2] [-seed 42] [-json]
+  skynet report [-last N] [-json]
   skynet status
 
 State:
