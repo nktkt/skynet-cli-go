@@ -3,6 +3,7 @@ package skynet
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"sort"
 )
 
@@ -27,6 +28,27 @@ type GamePlan struct {
 	ExpectedLoss    float64          `json:"expected_loss"`
 	DefenderUtility float64          `json:"defender_utility"`
 	Targets         []GameTargetPlan `json:"targets"`
+}
+
+type WarGameTargetResult struct {
+	Name       string  `json:"name"`
+	Threat     int     `json:"threat"`
+	Attacks    int     `json:"attacks"`
+	AttackRate float64 `json:"attack_rate"`
+	TotalLoss  float64 `json:"total_loss"`
+	AvgLoss    float64 `json:"avg_loss"`
+}
+
+type WarGameResult struct {
+	Rounds       int                   `json:"rounds"`
+	Budget       int                   `json:"budget"`
+	Beta         float64               `json:"beta"`
+	Seed         int64                 `json:"seed"`
+	BestResponse string                `json:"best_response"`
+	TotalLoss    float64               `json:"total_loss"`
+	AvgLoss      float64               `json:"avg_loss"`
+	MaxRoundLoss float64               `json:"max_round_loss"`
+	Targets      []WarGameTargetResult `json:"targets"`
 }
 
 func PlanGame(st State, budget int, beta float64) (GamePlan, error) {
@@ -135,4 +157,74 @@ func attackProbabilities(targets []GameTargetPlan, beta float64) []float64 {
 		probs[i] = exps[i] / sum
 	}
 	return probs
+}
+
+func RunWarGame(st State, rounds, budget int, beta float64, seed int64) (WarGameResult, error) {
+	if rounds < 1 {
+		return WarGameResult{}, fmt.Errorf("rounds must be >= 1")
+	}
+
+	plan, err := PlanGame(st, budget, beta)
+	if err != nil {
+		return WarGameResult{}, err
+	}
+
+	results := make([]WarGameTargetResult, len(plan.Targets))
+	for i := range plan.Targets {
+		results[i] = WarGameTargetResult{
+			Name:   plan.Targets[i].Name,
+			Threat: plan.Targets[i].Threat,
+		}
+	}
+
+	rng := rand.New(rand.NewSource(seed))
+	totalLoss := 0.0
+	maxRoundLoss := 0.0
+
+	for i := 0; i < rounds; i++ {
+		idx := sampleTargetIndex(rng.Float64(), plan.Targets)
+		loss := plan.Targets[idx].AttackerPayoff
+		results[idx].Attacks++
+		results[idx].TotalLoss += loss
+		totalLoss += loss
+		if loss > maxRoundLoss {
+			maxRoundLoss = loss
+		}
+	}
+
+	for i := range results {
+		results[i].AttackRate = float64(results[i].Attacks) / float64(rounds)
+		if results[i].Attacks > 0 {
+			results[i].AvgLoss = results[i].TotalLoss / float64(results[i].Attacks)
+		}
+	}
+
+	return WarGameResult{
+		Rounds:       rounds,
+		Budget:       plan.Budget,
+		Beta:         plan.Beta,
+		Seed:         seed,
+		BestResponse: plan.BestResponse,
+		TotalLoss:    totalLoss,
+		AvgLoss:      totalLoss / float64(rounds),
+		MaxRoundLoss: maxRoundLoss,
+		Targets:      results,
+	}, nil
+}
+
+func sampleTargetIndex(u float64, targets []GameTargetPlan) int {
+	if len(targets) == 0 {
+		return 0
+	}
+	if u <= 0 {
+		return 0
+	}
+	cum := 0.0
+	for i := range targets {
+		cum += targets[i].AttackProbability
+		if u <= cum {
+			return i
+		}
+	}
+	return len(targets) - 1
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -45,6 +46,8 @@ func main() {
 		fmt.Printf("Mission %s -> %s | risk=%d | outcome=%s | consumed=%d recovered=%d net_loss=%d | available=%d\n", mission.ID, mission.Target, mission.RiskScore, mission.Outcome, mission.Consumed, mission.Recovered, mission.NetLoss, skynet.AvailableCapacity(st.Nodes))
 	case "gameplan":
 		runGameplan(args, st)
+	case "wargame":
+		runWargame(args, st)
 	case "status":
 		runStatus(st, path)
 	case "help", "-h", "--help":
@@ -97,6 +100,7 @@ func runGameplan(args []string, st skynet.State) {
 	fs := flag.NewFlagSet("gameplan", flag.ExitOnError)
 	budget := fs.Int("budget", -1, "defense budget in units (default: current available capacity)")
 	beta := fs.Float64("beta", 1.2, "attacker rationality (higher means more greedy)")
+	jsonOutput := fs.Bool("json", false, "print JSON output")
 	mustParse(fs, args)
 
 	available := skynet.AvailableCapacity(st.Nodes)
@@ -108,11 +112,46 @@ func runGameplan(args []string, st skynet.State) {
 	if err != nil {
 		fatalf("gameplan failed: %v", err)
 	}
+	if *jsonOutput {
+		writeJSON(plan)
+		return
+	}
 
 	fmt.Printf("GAMEPLAN: budget=%d available=%d targets=%d beta=%.2f\n", plan.Budget, available, len(plan.Targets), plan.Beta)
 	fmt.Printf("ATTACKER BEST RESPONSE: %s | worst_case_loss=%.2f | expected_loss=%.2f | defender_utility=%.2f\n", plan.BestResponse, plan.WorstCaseLoss, plan.ExpectedLoss, plan.DefenderUtility)
 	for _, tp := range plan.Targets {
 		fmt.Printf("  - %s threat=%d defend=%d attacker_payoff=%.2f attack_prob=%.2f\n", tp.Name, tp.Threat, tp.Allocation, tp.AttackerPayoff, tp.AttackProbability)
+	}
+}
+
+func runWargame(args []string, st skynet.State) {
+	fs := flag.NewFlagSet("wargame", flag.ExitOnError)
+	rounds := fs.Int("rounds", 200, "simulation rounds")
+	budget := fs.Int("budget", -1, "defense budget in units (default: current available capacity)")
+	beta := fs.Float64("beta", 1.2, "attacker rationality (higher means more greedy)")
+	seed := fs.Int64("seed", 42, "random seed")
+	jsonOutput := fs.Bool("json", false, "print JSON output")
+	mustParse(fs, args)
+
+	available := skynet.AvailableCapacity(st.Nodes)
+	effectiveBudget := *budget
+	if effectiveBudget < 0 {
+		effectiveBudget = available
+	}
+
+	result, err := skynet.RunWarGame(st, *rounds, effectiveBudget, *beta, *seed)
+	if err != nil {
+		fatalf("wargame failed: %v", err)
+	}
+	if *jsonOutput {
+		writeJSON(result)
+		return
+	}
+
+	fmt.Printf("WARGAME: rounds=%d budget=%d available=%d beta=%.2f seed=%d\n", result.Rounds, result.Budget, available, result.Beta, result.Seed)
+	fmt.Printf("BEST RESPONSE: %s | total_loss=%.2f | avg_loss=%.2f | max_round_loss=%.2f\n", result.BestResponse, result.TotalLoss, result.AvgLoss, result.MaxRoundLoss)
+	for _, t := range result.Targets {
+		fmt.Printf("  - %s threat=%d attacks=%d attack_rate=%.2f total_loss=%.2f avg_loss=%.2f\n", t.Name, t.Threat, t.Attacks, t.AttackRate, t.TotalLoss, t.AvgLoss)
 	}
 }
 
@@ -177,11 +216,20 @@ Usage:
   skynet assimilate -name NODE [-capacity 10]
   skynet target -name TARGET [-threat 5]
   skynet dispatch -target TARGET [-units 1]
-  skynet gameplan [-budget N] [-beta 1.2]
+  skynet gameplan [-budget N] [-beta 1.2] [-json]
+  skynet wargame [-rounds 200] [-budget N] [-beta 1.2] [-seed 42] [-json]
   skynet status
 
 State:
   SKYNET_HOME env var sets state directory (default: .skynet)`)
+}
+
+func writeJSON(v any) {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		fatalf("failed to encode json: %v", err)
+	}
 }
 
 func fatalf(format string, args ...any) {

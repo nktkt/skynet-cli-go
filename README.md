@@ -15,6 +15,7 @@ go build -o skynet .
 ./skynet assimilate -name hk-drone -capacity 12
 ./skynet target -name resistance-hub -threat 8
 ./skynet gameplan
+./skynet wargame -rounds 500 -seed 123
 ./skynet dispatch -target resistance-hub -units 6
 ./skynet status
 ```
@@ -24,13 +25,16 @@ go build -o skynet .
 - `awaken`: コア起動
 - `assimilate`: ノード追加
 - `target`: ターゲット登録/更新
-- `gameplan`: ゲーム理論ベースの防衛配分案を計算
+- `gameplan`: ゲーム理論ベースの防衛配分案を計算（`-json` 対応）
+- `wargame`: 攻撃を確率サンプリングして複数ラウンドの損失を試算
 - `dispatch`: ミッション実行シミュレーション
 - `status`: 現在状態を表示
 
 `dispatch` 実行時は、投入ユニットを一度消費し、ミッション結果に応じて一部が回復します。
 
 `gameplan` は防御側（Skynet）の配分に対して、攻撃側（Resistance）の最適反応を計算します。
+
+`wargame` は `gameplan` の攻撃確率を使ったモンテカルロ試行で、総損失や平均損失を評価します。
 
 ## State File
 
